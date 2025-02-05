@@ -215,6 +215,7 @@ internal fun NiaApp(
                             containerColor = Color.Transparent,
                         ),
                         onActionClick = { onTopAppBarActionClick() },
+                        // 点击搜索按钮，跳转到搜索页面
                         onNavigationClick = { appState.navigateToSearch() },
                     )
                 }

@@ -59,21 +59,21 @@ class MainActivity : ComponentActivity() {
      * Lazily inject [JankStats], which is used to track jank throughout the app.
      */
     @Inject
-    lateinit var lazyStats: dagger.Lazy<JankStats>
+    lateinit var lazyStats: dagger.Lazy<JankStats>  // 用于监控应用性能和卡顿
 
     @Inject
-    lateinit var networkMonitor: NetworkMonitor
+    lateinit var networkMonitor: NetworkMonitor  // 用于监控网络状态
 
     @Inject
-    lateinit var timeZoneMonitor: TimeZoneMonitor
+    lateinit var timeZoneMonitor: TimeZoneMonitor  // 用于监控时区
 
     @Inject
-    lateinit var analyticsHelper: AnalyticsHelper
+    lateinit var analyticsHelper: AnalyticsHelper  // 用于收集和报告应用性能和用户行为数据
 
     @Inject
-    lateinit var userNewsResourceRepository: UserNewsResourceRepository
+    lateinit var userNewsResourceRepository: UserNewsResourceRepository  // 用于管理用户新闻资源
 
-    private val viewModel: MainActivityViewModel by viewModels()
+    private val viewModel: MainActivityViewModel by viewModels()  // 用于管理主活动的状态和逻辑
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
@@ -92,31 +92,34 @@ class MainActivity : ComponentActivity() {
         // Update the uiState
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // 组合系统深色主题状态和视图模型UI状态
                 combine(
-                    isSystemInDarkTheme(),
-                    viewModel.uiState,
+                    isSystemInDarkTheme(), // 获取系统深色主题状态
+                    viewModel.uiState, // 获取视图模型UI状态
                 ) { systemDark, uiState ->
+                    // 创建主题设置对象
                     ThemeSettings(
-                        darkTheme = uiState.shouldUseDarkTheme(systemDark),
-                        androidTheme = uiState.shouldUseAndroidTheme,
-                        disableDynamicTheming = uiState.shouldDisableDynamicTheming,
+                        darkTheme = uiState.shouldUseDarkTheme(systemDark), // 根据系统和用户偏好决定是否使用深色主题
+                        androidTheme = uiState.shouldUseAndroidTheme, // 是否使用Android主题
+                        disableDynamicTheming = uiState.shouldDisableDynamicTheming, // 是否禁用动态主题
                     )
                 }
-                    .onEach { themeSettings = it }
-                    .map { it.darkTheme }
-                    .distinctUntilChanged()
+                    .onEach { themeSettings = it } // 更新主题设置状态
+                    .map { it.darkTheme } // 提取深色主题状态
+                    .distinctUntilChanged() // 仅在深色主题状态改变时触发
                     .collect { darkTheme ->
                         trace("niaEdgeToEdge") {
-                            // Turn off the decor fitting system windows, which allows us to handle insets,
-                            // including IME animations, and go edge-to-edge.
-                            // This is the same parameters as the default enableEdgeToEdge call, but we manually
-                            // resolve whether or not to show dark theme using uiState, since it can be different
-                            // than the configuration's dark theme value based on the user preference.
+                            // 配置边到边显示
+                            // 关闭系统窗口装饰适配,以便处理插图(包括IME动画)并实现边到边显示
+                            // 这与默认的enableEdgeToEdge调用参数相同,但我们手动根据uiState解析是否显示深色主题
+                            // 因为基于用户偏好,它可能与配置的深色主题值不同
                             enableEdgeToEdge(
+                                // 配置状态栏样式
                                 statusBarStyle = SystemBarStyle.auto(
                                     lightScrim = android.graphics.Color.TRANSPARENT,
                                     darkScrim = android.graphics.Color.TRANSPARENT,
                                 ) { darkTheme },
+                                // 配置导航栏样式
                                 navigationBarStyle = SystemBarStyle.auto(
                                     lightScrim = lightScrim,
                                     darkScrim = darkScrim,

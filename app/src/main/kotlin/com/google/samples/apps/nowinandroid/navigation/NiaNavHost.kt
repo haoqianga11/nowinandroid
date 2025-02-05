@@ -49,6 +49,7 @@ fun NiaNavHost(
         startDestination = ForYouBaseRoute,
         modifier = modifier,
     ) {
+        // 注册首页路由
         forYouSection(
             onTopicClick = navController::navigateToTopic,
         ) {
@@ -62,6 +63,8 @@ fun NiaNavHost(
             onTopicClick = navController::navigateToInterests,
             onShowSnackbar = onShowSnackbar,
         )
+
+        // 注册搜索页面路由
         searchScreen(
             onBackClick = navController::popBackStack,
             onInterestsClick = { appState.navigateToTopLevelDestination(INTERESTS) },
