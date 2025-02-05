@@ -39,32 +39,56 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * 搜索功能的 ViewModel
+ * 负责管理搜索相关的 UI 状态和业务逻辑
+ */
 @HiltViewModel
 class SearchViewModel @Inject constructor(
+    // 用于执行搜索内容的用例
     getSearchContentsUseCase: GetSearchContentsUseCase,
+    // 用于获取最近搜索记录的用例
     recentSearchQueriesUseCase: GetRecentSearchQueriesUseCase,
+    // 搜索内容仓库
     private val searchContentsRepository: SearchContentsRepository,
+    // 最近搜索记录仓库
     private val recentSearchRepository: RecentSearchRepository,
+    // 用户数据仓库
     private val userDataRepository: UserDataRepository,
+    // 用于保存 ViewModel 状态
     private val savedStateHandle: SavedStateHandle,
+    // 用于记录分析事件
     private val analyticsHelper: AnalyticsHelper,
 ) : ViewModel() {
 
+    // 搜索查询词状态流，使用 SavedStateHandle 保存状态
     val searchQuery = savedStateHandle.getStateFlow(key = SEARCH_QUERY, initialValue = "")
 
+    /**
+     * 搜索结果的 UI 状态流
+     * 包含以下状态：
+     * 1. Loading：加载中
+     * 2. SearchNotReady：搜索功能未就绪
+     * 3. EmptyQuery：空查询
+     * 4. Success：搜索成功，包含话题和新闻资源
+     * 5. LoadFailed：加载失败
+     */
     val searchResultUiState: StateFlow<SearchResultUiState> =
         searchContentsRepository.getSearchContentsCount()
             .flatMapLatest { totalCount ->
+                // 检查搜索内容是否就绪
                 if (totalCount < SEARCH_MIN_FTS_ENTITY_COUNT) {
                     flowOf(SearchResultUiState.SearchNotReady)
                 } else {
+                    // 监听搜索查询的变化
                     searchQuery.flatMapLatest { query ->
+                        // 检查查询词长度
                         if (query.trim().length < SEARCH_QUERY_MIN_LENGTH) {
                             flowOf(SearchResultUiState.EmptyQuery)
                         } else {
+                            // 执行搜索并转换结果
                             getSearchContentsUseCase(query)
-                                // Not using .asResult() here, because it emits Loading state every
-                                // time the user types a letter in the search box, which flickers the screen.
+                                // 不使用 asResult()，避免每次输入字符都触发 Loading 状态导致界面闪烁
                                 .map<UserSearchResult, SearchResultUiState> { data ->
                                     SearchResultUiState.Success(
                                         topics = data.topics,
@@ -81,6 +105,10 @@ class SearchViewModel @Inject constructor(
                 initialValue = SearchResultUiState.Loading,
             )
 
+    /**
+     * 最近搜索记录的 UI 状态流
+     * 使用 UseCase 获取数据并转换为 UI 状态
+     */
     val recentSearchQueriesUiState: StateFlow<RecentSearchQueriesUiState> =
         recentSearchQueriesUseCase()
             .map(RecentSearchQueriesUiState::Success)
@@ -90,16 +118,18 @@ class SearchViewModel @Inject constructor(
                 initialValue = RecentSearchQueriesUiState.Loading,
             )
 
+    /**
+     * 处理搜索查询变化
+     * 将新的查询词保存到 SavedStateHandle
+     */
     fun onSearchQueryChanged(query: String) {
         savedStateHandle[SEARCH_QUERY] = query
     }
 
     /**
-     * Called when the search action is explicitly triggered by the user. For example, when the
-     * search icon is tapped in the IME or when the enter key is pressed in the search text field.
-     *
-     * The search results are displayed on the fly as the user types, but to explicitly save the
-     * search query in the search text field, defining this method.
+     * 处理搜索触发事件
+     * 当用户点击搜索图标或按下回车键时调用
+     * 保存搜索记录并记录分析事件
      */
     fun onSearchTriggered(query: String) {
         if (query.isBlank()) return
@@ -109,24 +139,36 @@ class SearchViewModel @Inject constructor(
         analyticsHelper.logEventSearchTriggered(query = query)
     }
 
+    /**
+     * 清除最近搜索记录
+     */
     fun clearRecentSearches() {
         viewModelScope.launch {
             recentSearchRepository.clearRecentSearches()
         }
     }
 
+    /**
+     * 设置新闻资源的书签状态
+     */
     fun setNewsResourceBookmarked(newsResourceId: String, isChecked: Boolean) {
         viewModelScope.launch {
             userDataRepository.setNewsResourceBookmarked(newsResourceId, isChecked)
         }
     }
 
+    /**
+     * 设置话题的关注状态
+     */
     fun followTopic(followedTopicId: String, followed: Boolean) {
         viewModelScope.launch {
             userDataRepository.setTopicIdFollowed(followedTopicId, followed)
         }
     }
 
+    /**
+     * 设置新闻资源的查看状态
+     */
     fun setNewsResourceViewed(newsResourceId: String, viewed: Boolean) {
         viewModelScope.launch {
             userDataRepository.setNewsResourceViewed(newsResourceId, viewed)
@@ -134,6 +176,9 @@ class SearchViewModel @Inject constructor(
     }
 }
 
+/**
+ * 记录搜索触发事件
+ */
 private fun AnalyticsHelper.logEventSearchTriggered(query: String) =
     logEvent(
         event = AnalyticsEvent(
@@ -142,9 +187,11 @@ private fun AnalyticsHelper.logEventSearchTriggered(query: String) =
         ),
     )
 
-/** Minimum length where search query is considered as [SearchResultUiState.EmptyQuery] */
+/** 搜索查询的最小长度，小于此长度视为空查询 */
 private const val SEARCH_QUERY_MIN_LENGTH = 2
 
-/** Minimum number of the fts table's entity count where it's considered as search is not ready */
+/** 搜索内容表中的最小实体数量，小于此数量视为搜索未就绪 */
 private const val SEARCH_MIN_FTS_ENTITY_COUNT = 1
+
+/** SavedStateHandle 中保存搜索查询的 key */
 private const val SEARCH_QUERY = "searchQuery"

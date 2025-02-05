@@ -155,4 +155,135 @@ class GetSearchContentsUseCase @Inject constructor(
 - 模块化结构
 - 清晰的职责划分
 - 统一的命名规范
-- 完善的文档注释 
+- 完善的文档注释
+
+## 五、搜索功能实现示例
+
+### 1. 功能架构概览
+#### 1.1 模块职责
+- App 模块：提供导航框架和全局状态管理
+- Feature Search 模块：实现搜索功能的具体逻辑
+- Core 模块：提供基础设施支持
+
+#### 1.2 关键组件
+- 表现层：
+  - SearchScreen（View）
+  - SearchViewModel（ViewModel）
+  - SearchResultUiState（Model）
+- 领域层：
+  - GetSearchContentsUseCase
+  - SearchContentsRepository 接口
+- 数据层：
+  - OfflineFirstSearchRepository 实现
+  - SearchDao
+  - NetworkDataSource
+
+### 2. 调用链路示例
+#### 2.1 导航触发
+```kotlin
+// App 模块中的导航定义
+NavHost(navController, startDestination = ForYouBaseRoute) {
+    searchScreen(
+        onBackClick = navController::popBackStack,
+        onInterestsClick = { appState.navigateToTopLevelDestination(INTERESTS) },
+        onTopicClick = navController::navigateToInterests,
+    )
+}
+
+// 顶部栏搜索按钮点击
+NiaTopAppBar(
+    navigationIcon = NiaIcons.Search,
+    onNavigationClick = { appState.navigateToSearch() }
+)
+```
+
+#### 2.2 搜索功能流程
+1. **用户交互流**：
+```
+用户点击搜索图标
+↓
+NiaTopAppBar.onNavigationClick
+↓
+appState.navigateToSearch()
+↓
+NavController 导航到搜索路由
+↓
+SearchScreen 组件挂载
+↓
+SearchViewModel 初始化
+```
+
+2. **数据处理流**：
+```
+用户输入搜索关键词
+↓
+SearchViewModel.onSearchQueryChanged
+↓
+GetSearchContentsUseCase 处理搜索逻辑
+↓
+SearchContentsRepository 获取数据
+↓
+ViewModel 更新 SearchResultUiState
+↓
+UI 更新显示搜索结果
+```
+
+### 3. 关键实现细节
+#### 3.1 状态管理
+```kotlin
+// SearchViewModel 中的状态定义
+val searchResultUiState: StateFlow<SearchResultUiState> =
+    searchContentsRepository.getSearchContentsCount()
+        .flatMapLatest { totalCount ->
+            if (totalCount < SEARCH_MIN_FTS_ENTITY_COUNT) {
+                flowOf(SearchResultUiState.SearchNotReady)
+            } else {
+                // 处理搜索逻辑
+            }
+        }
+```
+
+#### 3.2 模块化导航
+```kotlin
+// Feature 模块提供导航路由
+fun NavGraphBuilder.searchScreen(
+    onBackClick: () -> Unit,
+    onInterestsClick: () -> Unit,
+    onTopicClick: (String) -> Unit,
+) {
+    composable(route = searchRoute) {
+        SearchRoute(...)
+    }
+}
+```
+
+#### 3.3 依赖注入
+```kotlin
+@HiltViewModel
+class SearchViewModel @Inject constructor(
+    getSearchContentsUseCase: GetSearchContentsUseCase,
+    recentSearchQueriesUseCase: GetRecentSearchQueriesUseCase,
+    private val searchContentsRepository: SearchContentsRepository,
+) : ViewModel()
+```
+
+### 4. 架构特点总结
+#### 4.1 模块解耦
+- App 模块只依赖 Feature 模块的导航 API
+- Feature 模块通过接口依赖 Core 模块
+- 各模块独立开发和测试
+
+#### 4.2 状态管理
+- 全局导航状态在 App 模块统一管理
+- 搜索功能状态在 Feature 模块内部管理
+- 使用 StateFlow 实现响应式 UI 更新
+
+#### 4.3 可测试性
+- 表现层：UI 测试和 ViewModel 单元测试
+- 领域层：UseCase 的业务逻辑测试
+- 数据层：Repository 的数据处理测试
+
+#### 4.4 性能优化
+- 使用 Flow 实现响应式数据流
+- 实现离线优先的数据访问策略
+- 搜索结果的增量更新机制 

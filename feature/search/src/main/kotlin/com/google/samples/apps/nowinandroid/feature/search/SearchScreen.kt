@@ -95,22 +95,30 @@ import com.google.samples.apps.nowinandroid.core.ui.TrackScreenViewEvent
 import com.google.samples.apps.nowinandroid.core.ui.newsFeed
 import com.google.samples.apps.nowinandroid.feature.search.R as searchR
 
+/**
+ * 搜索功能的路由入口
+ * 负责连接 ViewModel 和 UI，收集状态并传递给 SearchScreen
+ */
 @Composable
 internal fun SearchRoute(
-    onBackClick: () -> Unit,
-    onInterestsClick: () -> Unit,
-    onTopicClick: (String) -> Unit,
+    onBackClick: () -> Unit,          // 返回按钮点击回调
+    onInterestsClick: () -> Unit,     // 兴趣点击回调
+    onTopicClick: (String) -> Unit,   // 话题点击回调
     modifier: Modifier = Modifier,
-    searchViewModel: SearchViewModel = hiltViewModel(),
+    searchViewModel: SearchViewModel = hiltViewModel(), // 通过 Hilt 注入 ViewModel
 ) {
+    // 使用 collectAsStateWithLifecycle 收集 ViewModel 中的状态流
     val recentSearchQueriesUiState by searchViewModel.recentSearchQueriesUiState.collectAsStateWithLifecycle()
     val searchResultUiState by searchViewModel.searchResultUiState.collectAsStateWithLifecycle()
     val searchQuery by searchViewModel.searchQuery.collectAsStateWithLifecycle()
+
+    // 将收集到的状态传递给实际的 UI 组件
     SearchScreen(
         modifier = modifier,
         searchQuery = searchQuery,
         recentSearchesUiState = recentSearchQueriesUiState,
         searchResultUiState = searchResultUiState,
+        // 传递 ViewModel 中的事件处理函数
         onSearchQueryChanged = searchViewModel::onSearchQueryChanged,
         onSearchTriggered = searchViewModel::onSearchTriggered,
         onClearRecentSearches = searchViewModel::clearRecentSearches,
@@ -123,39 +131,53 @@ internal fun SearchRoute(
     )
 }
 
+/**
+ * 搜索界面的主要 UI 组件
+ * 包含搜索栏、搜索结果展示等
+ */
 @Composable
 internal fun SearchScreen(
     modifier: Modifier = Modifier,
-    searchQuery: String = "",
-    recentSearchesUiState: RecentSearchQueriesUiState = RecentSearchQueriesUiState.Loading,
-    searchResultUiState: SearchResultUiState = SearchResultUiState.Loading,
-    onSearchQueryChanged: (String) -> Unit = {},
-    onSearchTriggered: (String) -> Unit = {},
-    onClearRecentSearches: () -> Unit = {},
-    onNewsResourcesCheckedChanged: (String, Boolean) -> Unit = { _, _ -> },
-    onNewsResourceViewed: (String) -> Unit = {},
-    onFollowButtonClick: (String, Boolean) -> Unit = { _, _ -> },
-    onBackClick: () -> Unit = {},
-    onInterestsClick: () -> Unit = {},
-    onTopicClick: (String) -> Unit = {},
+    searchQuery: String = "",                     // 搜索关键词
+    recentSearchesUiState: RecentSearchQueriesUiState = RecentSearchQueriesUiState.Loading,  // 最近搜索状态
+    searchResultUiState: SearchResultUiState = SearchResultUiState.Loading,                   // 搜索结果状态
+    onSearchQueryChanged: (String) -> Unit = {},  // 搜索词变化回调
+    onSearchTriggered: (String) -> Unit = {},    // 触发搜索回调
+    onClearRecentSearches: () -> Unit = {},      // 清除最近搜索回调
+    onNewsResourcesCheckedChanged: (String, Boolean) -> Unit = { _, _ -> },  // 新闻资源选中状态变化
+    onNewsResourceViewed: (String) -> Unit = {},  // 新闻资源查看回调
+    onFollowButtonClick: (String, Boolean) -> Unit = { _, _ -> },  // 关注按钮点击回调
+    onBackClick: () -> Unit = {},                // 返回按钮点击回调
+    onInterestsClick: () -> Unit = {},           // 兴趣点击回调
+    onTopicClick: (String) -> Unit = {},         // 话题点击回调
 ) {
+    // 记录屏幕查看事件
     TrackScreenViewEvent(screenName = "Search")
+
+    // 使用 Column 布局垂直排列组件
     Column(modifier = modifier) {
+        // 添加顶部安全区域间距
         Spacer(Modifier.windowInsetsTopHeight(WindowInsets.safeDrawing))
+        
+        // 搜索工具栏
         SearchToolbar(
             onBackClick = onBackClick,
             onSearchQueryChanged = onSearchQueryChanged,
             onSearchTriggered = onSearchTriggered,
             searchQuery = searchQuery,
         )
-        when (searchResultUiState) {
-            SearchResultUiState.Loading,
-            SearchResultUiState.LoadFailed,
-            -> Unit
 
+        // 根据搜索结果状态显示不同的 UI
+        when (searchResultUiState) {
+            // 加载中或加载失败状态
+            SearchResultUiState.Loading,
+            SearchResultUiState.LoadFailed -> Unit
+
+            // 搜索未就绪状态
             SearchResultUiState.SearchNotReady -> SearchNotReadyBody()
-            SearchResultUiState.EmptyQuery,
-            -> {
+
+            // 空查询状态，显示最近搜索记录
+            SearchResultUiState.EmptyQuery -> {
                 if (recentSearchesUiState is RecentSearchQueriesUiState.Success) {
                     RecentSearchesBody(
                         onClearRecentSearches = onClearRecentSearches,
@@ -168,12 +190,15 @@ internal fun SearchScreen(
                 }
             }
 
+            // 搜索成功状态
             is SearchResultUiState.Success -> {
                 if (searchResultUiState.isEmpty()) {
+                    // 空结果显示
                     EmptySearchResultBody(
                         searchQuery = searchQuery,
                         onInterestsClick = onInterestsClick,
                     )
+                    // 同时显示最近搜索记录
                     if (recentSearchesUiState is RecentSearchQueriesUiState.Success) {
                         RecentSearchesBody(
                             onClearRecentSearches = onClearRecentSearches,
@@ -185,6 +210,7 @@ internal fun SearchScreen(
                         )
                     }
                 } else {
+                    // 显示搜索结果
                     SearchResultBody(
                         searchQuery = searchQuery,
                         topics = searchResultUiState.topics,
@@ -198,10 +224,15 @@ internal fun SearchScreen(
                 }
             }
         }
+
+        // 添加底部安全区域间距
         Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.safeDrawing))
     }
 }
 
+/**
+ * 空搜索结果界面
+ */
 @Composable
 fun EmptySearchResultBody(
     searchQuery: String,
@@ -211,12 +242,14 @@ fun EmptySearchResultBody(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(horizontal = 48.dp),
     ) {
+        // 构建"未找到结果"的提示文本
         val message = stringResource(id = searchR.string.feature_search_result_not_found, searchQuery)
         val start = message.indexOf(searchQuery)
         Text(
             text = AnnotatedString(
                 text = message,
                 spanStyles = listOf(
+                    // 将搜索关键词加粗显示
                     AnnotatedString.Range(
                         SpanStyle(fontWeight = FontWeight.Bold),
                         start = start,
@@ -228,9 +261,12 @@ fun EmptySearchResultBody(
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(vertical = 24.dp),
         )
+
+        // 构建"尝试其他搜索"的提示文本
         val tryAnotherSearchString = buildAnnotatedString {
             append(stringResource(id = searchR.string.feature_search_try_another_search))
             append(" ")
+            // 添加可点击的"兴趣"链接
             withLink(
                 LinkAnnotation.Clickable(
                     tag = "",
@@ -248,9 +284,6 @@ fun EmptySearchResultBody(
                     append(stringResource(id = searchR.string.feature_search_interests))
                 }
             }
-
-            append(" ")
-            append(stringResource(id = searchR.string.feature_search_to_browse_topics))
         }
         Text(
             text = tryAnotherSearchString,
